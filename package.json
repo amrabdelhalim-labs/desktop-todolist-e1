@@ -1,0 +1,24 @@
+{
+  "name": "todo-list",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/amrabdelhalim-labs/desktop-todolist-e1#readme",
+  "bugs": {
+    "url": "https://github.com/amrabdelhalim-labs/desktop-todolist-e1/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amrabdelhalim-labs/desktop-todolist-e1.git"
+  },
+  "license": "ISC",
+  "author": "Amr Abdelhalim",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "electron": "^39.2.3"
+  }
+}
