@@ -1,3 +1,3 @@
 require("./config/indexNormal");
 require("./config/indexTimed");
-// require("./config/indexImaged");
+require("./config/indexImaged");

@@ -2,9 +2,12 @@ const { app, BrowserWindow, Menu, ipcMain, dialog, Notification } = require('ele
 const path = require('path');
 const fs = require('fs');
 
+const appPath = app.getPath('userData');
+
 let mainWindow,
     addWindow,
-    timedWindow;
+    timedWindow,
+    imagedWindow;
 
 const mainMenuTemplate = [
     {
@@ -19,7 +22,13 @@ const mainMenuTemplate = [
             {
                 label: 'إضافة مهمة مؤقتة',
                 click() {
-                    craeteTimedWindow();
+                    createTimedWindow();
+                },
+            },
+            {
+                label: 'إضافة مهمة مع صورة',
+                click() {
+                    createImagedWindow();
                 },
             },
             {
@@ -53,7 +62,7 @@ const intitAddWindow = () => {
     });
 };
 
-const craeteTimedWindow = () => {
+const createTimedWindow = () => {
     timedWindow = new BrowserWindow({
         width: 400,
         height: 400,
@@ -70,6 +79,25 @@ const craeteTimedWindow = () => {
     timedWindow.on('closed', (e) => {
         e.preventDefault();
         timedWindow = null;
+    });
+};
+
+const createImagedWindow = () => {
+    imagedWindow = new BrowserWindow({
+        width: 400,
+        height: 420,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+    });
+
+    imagedWindow.loadFile(path.join(__dirname, './views/imagedTask.html'));
+    imagedWindow.removeMenu();
+
+    imagedWindow.on('closed', (e) => {
+        e.preventDefault();
+        imagedWindow = null;
     });
 };
 
@@ -100,12 +128,21 @@ ipcMain.on("add-timed-task", (e, note, time) => {
     timedWindow.close();
 });
 
+ipcMain.on("add-imaged-task", (e, note, imgUri) => {
+    mainWindow.webContents.send("add-imaged-task", note, imgUri);
+    imagedWindow.close();
+});
+
 ipcMain.on("new-normal-task", () => {
     intitAddWindow();
 });
 
 ipcMain.on("new-timed-task", () => {
-    craeteTimedWindow();
+    createTimedWindow();
+});
+
+ipcMain.on("new-imaged-task", () => {
+    createImagedWindow();
 });
 
 ipcMain.on("notify", (e, taskValue) => {
@@ -130,6 +167,23 @@ ipcMain.on("create-txt", (e, taskNote) => {
             fs.writeFile(file.filePath.toString(), taskNote, (err) => {
                 if (err) throw err;
             });
+        };
+    }).catch((err) => {
+        console.log(err);
+    });
+});
+
+ipcMain.on("upload-image", (e) => {
+    dialog.showOpenDialog({
+        title: "اختر صورة",
+        properties: ['openFile'],
+        filters: [
+            { name: 'Images', extensions: ['jpg', 'png', 'gif'] },
+            { name: 'All Files', extensions: ['*'] }
+        ],
+    }).then((file) => {
+        if (!file.canceled) {
+            e.sender.send("open-file", file.filePaths, appPath);
         };
     }).catch((err) => {
         console.log(err);
