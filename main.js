@@ -1,6 +1,7 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, Notification } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, Notification, Tray } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { create } = require('domain');
 
 const appPath = app.getPath('userData');
 
@@ -8,6 +9,8 @@ let mainWindow,
     addWindow,
     timedWindow,
     imagedWindow;
+
+let tray = null;
 
 const mainMenuTemplate = [
     {
@@ -41,6 +44,33 @@ const mainMenuTemplate = [
         ],
     },
 ];
+
+const createTray = () => {
+    const tray = new Tray(path.join(__dirname, './assets/images/icon.png'));
+    const contextMenu = Menu.buildFromTemplate([
+        {
+            label: 'إظهار التطبيق',
+            click: () => {
+                mainWindow.show();
+            },
+        },
+        {
+            label: 'إغلاق التطبيق',
+            click: () => {
+                app.quit();
+            },
+        },
+    ]);
+
+    tray.on('click', () => {
+        mainWindow.show();
+    });
+
+    tray.setContextMenu(contextMenu);
+    tray.setToolTip('تطبيق إدارة المهام');
+
+    return tray;
+};
 
 const intitAddWindow = () => {
     addWindow = new BrowserWindow({
@@ -101,6 +131,8 @@ const createImagedWindow = () => {
     });
 };
 
+process.env.NODE_ENV = 'production';
+
 app.on('ready', () => {
     const mainMenu = Menu.buildFromTemplate(mainMenuTemplate);
 
@@ -116,6 +148,27 @@ app.on('ready', () => {
 
     mainWindow.loadFile('index.html');
     Menu.setApplicationMenu(mainMenu);
+
+    mainWindow.on('closed', () => {
+        app.quit();
+    });
+
+    mainWindow.on('window-all-closed', (e) => {
+        if (process.platform !== 'darwin') {
+            app.quit();
+        };
+    });
+
+    mainWindow.on('minimize', (event) => {
+        event.preventDefault();
+        mainWindow.hide();
+        tray = createTray();
+    });
+
+    mainWindow.on('restore', () => {
+        mainWindow.show();
+        tray.destroy();
+    });
 });
 
 ipcMain.on("add-normal-task", (e, task) => {
@@ -189,6 +242,10 @@ ipcMain.on("upload-image", (e) => {
         console.log(err);
     });
 });
+
+if (process.platform === 'darwin') {
+    mainMenuTemplate.unshift({});
+};
 
 if (process.env.NODE_ENV !== "production") {
     mainMenuTemplate.push({
