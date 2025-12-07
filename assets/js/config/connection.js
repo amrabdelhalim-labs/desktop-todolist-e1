@@ -1,4 +1,3 @@
-const JsStore = require('jsstore');
 
 //إعدادات قاعدة البيانات
 let dbName = 'todo_app';
@@ -10,7 +9,9 @@ function getDbSchema() {
         name: 'tasks',
         columns: {
             id: { primaryKey: true, autoIncrement: true },
-            note: { notNull: true, dataType: "string" }
+            note: { notNull: true, dataType: "string" },
+            createdAt: { notNull: true, dataType: "date_time", default: new Date() },
+            isCompleted: { notNull: true, dataType: "boolean", default: false }
         }
     };
 
@@ -37,6 +38,7 @@ function getDbSchema() {
 
     let db = {
         name: dbName,
+        version: 2,
         tables: [tblTasks, tblTimed, tblImaged]
     }
     return db;
@@ -59,5 +61,3 @@ async function initJsStore() {
 
 //استدعاء تابع قاعدة البيانات
 initJsStore();
-
-module.exports = connection;

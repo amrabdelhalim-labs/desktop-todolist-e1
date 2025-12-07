@@ -1,4 +1,3 @@
-const { ipcRenderer } = require("electron");
 const form = document.querySelector("form");
 
 
@@ -11,5 +10,5 @@ form.addEventListener("submit", (e) => {
     e.preventDefault();
     notificationTime += (pickedHours + pickedMinutes);
     notificationTime = new Date(notificationTime);
-    ipcRenderer.send("add-timed-task", note, notificationTime);
+    window.api.send("add-timed-task", note, notificationTime);
 });

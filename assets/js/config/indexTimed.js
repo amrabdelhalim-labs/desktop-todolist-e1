@@ -1,6 +1,3 @@
-const { ipcRenderer } = require("electron");
-const connection = require("./connection");
-
 const newTimed = document.querySelector(".todo--timed .add-new-task");
 
 const addTimedTask = (note, notificationTime) => {
@@ -88,7 +85,7 @@ const showTimed = () => {
                     let currentDate = new Date();
 
                     if (task.pick_time.toString() === currentDate.toString()) {
-                        ipcRenderer.send("notify", task.note);
+                        window.api.send("notify", task.note);
                         connection.update({
                             in: 'timed',
                             where: {
@@ -107,7 +104,7 @@ const showTimed = () => {
 
                 //إضافة حدث على زر تصدير المهمة كملف نصى
                 exportBTN.addEventListener("click", () => {
-                    ipcRenderer.send("create-txt", task.note);
+                    window.api.send("create-txt", task.note);
                 });
 
                 //إضافة حدث على زر حذف المهمة
@@ -136,10 +133,10 @@ showTimed();
 
 //إرسال حدث لإنشاء نافذة جديدة إلى العملية الرئيسية
 newTimed.addEventListener("click", () => {
-    ipcRenderer.send("new-timed-task");
+    window.api.send("new-timed-task");
 });
 
 //استقبال حدث إضافة مهمة ذات توقيت من العملية الرئيسية 
-ipcRenderer.on('add-timed-task', (e, note, notificationTime) => {
+window.api.receive('add-timed-task', (note, notificationTime) => {
     addTimedTask(note, notificationTime);
 });

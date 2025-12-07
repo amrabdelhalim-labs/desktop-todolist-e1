@@ -1,6 +1,3 @@
-const { ipcRenderer } = require("electron");
-const connection = require("./connection.js");
-
 const newTaskButton = document.querySelector(".todo--normal .add-new-task");
 
 const addNewTask = (task) => {
@@ -79,7 +76,7 @@ const showNormalTasks = () => {
 
                 //إضافة حدث على زر تصدير المهمة كملف نصي
                 exportBTN.addEventListener("click", function () {
-                    ipcRenderer.send("create-txt", task.note);
+                    window.api.send("create-txt", task.note);
                 });
 
                 //إضافة حدث على زر حذف المهمة
@@ -106,9 +103,9 @@ const showNormalTasks = () => {
 showNormalTasks();
 
 newTaskButton.addEventListener("click", () => {
-    ipcRenderer.send("new-normal-task");
+    window.api.send("new-normal-task");
 });
 
-ipcRenderer.on("add-normal-task", (e, task) => {
+window.api.receive("add-normal-task", (task) => {
     addNewTask(task);
 });

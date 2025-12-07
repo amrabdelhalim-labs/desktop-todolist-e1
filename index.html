@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file:">
     <title>تطبيق إدارة المهام</title>
     <link rel="stylesheet" href="./assets/css/style.css">
     <link rel="stylesheet" href="./assets/css/all.min.css">
@@ -79,9 +80,11 @@
             </div>
         </section>
     </div>
-    
-    <script>
-        require('./assets/js/index.js');
-    </script></body>
+    <script src="node_modules/jsstore/dist/jsstore.min.js"></script>
+    <script src="assets/js/config/connection.js"></script>
+    <script src="./assets/js/config/indexNormal.js"></script>
+    <script src="./assets/js/config/indexTimed.js"></script>
+    <script src="./assets/js/config/indexImaged.js"></script>    
+</body>
 
 </html>

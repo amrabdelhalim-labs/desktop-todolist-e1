@@ -1,7 +1,3 @@
-const { ipcRenderer } = require("electron");
-const fs = require('fs');
-const connection = require("./connection");
-
 const newImaged = document.querySelector(".todo--images .add-new-task");
 
 const addImagedTask = (note, imgURI) => {
@@ -30,13 +26,8 @@ const updateImagedTask = (taskId, taskValue) => {
 //تابع حذف مهمة ذات صورة
 const deleteImagedTask = (tasksId, imgPath) => {
     if (imgPath) {
-        //حذف الصورة من ملفات التطبيق ايضا
-        fs.unlink(imgPath, (err) => {
-            if (err) {
-                console.error(err)
-                return
-            };
-        });
+        //إرسال طلب حذف الصورة إلى العملية الرئيسية
+        window.api.send("delete-image", imgPath);
     };
 
     return connection.remove({
@@ -93,12 +84,17 @@ const showImaged = () => {
 
                 //إضافة خصائص لعناصر المهمة
                 taskInput.value = task.note;
-                taskImage.setAttribute("src", task.img_uri);
+                // تحويل المسار المحلي إلى file:// URI
+                let imgSrc = task.img_uri;
+                if (!imgSrc.startsWith('http') && !imgSrc.startsWith('data:')) {
+                    imgSrc = 'file:///' + imgSrc.replace(/\\/g, '/');
+                };
+                taskImage.setAttribute("src", imgSrc);
                 taskInput.setAttribute('id', task.id);
 
                 //إضافة حدث على زر تصدير المهمة كملف نصى
                 exportBTN.addEventListener("click", () => {
-                    ipcRenderer.send("create-txt", task.note);
+                    window.api.send("create-txt", task.note);
                 });
 
                 //إضافة حدث على زر حذف المهمة
@@ -112,13 +108,8 @@ const showImaged = () => {
                 });
 
                 clearImagedBtn.addEventListener("click", () => {
-                    //حذف الصورة من ملفات التطبيق ايضا عند حذف كل المهام
-                    fs.unlink(task.img_uri, (err) => {
-                        if (err) {
-                            console.error(err)
-                            return;
-                        };
-                    });
+                    //إرسال طلب حذف الصورة من ملفات التطبيق عند حذف كل المهام
+                    window.api.send("delete-image", task.img_uri);
                 });
 
                 // إرفاق العناصر إلى الحاويات الخاصة بها
@@ -147,10 +138,10 @@ showImaged();
 
 //إرسال حدث لإنشاء نافذة جديدة إلى العملية الرئيسية
 newImaged.addEventListener("click", () => {
-    ipcRenderer.send("new-imaged-task");
+    window.api.send("new-imaged-task");
 });
 
 //استقبال حدث إضافة مهمة ذات صورة من العملية الرئيسية 
-ipcRenderer.on('add-imaged-task', (e, note, imgURI) => {
+window.api.receive('add-imaged-task', (note, imgURI) => {
     addImagedTask(note, imgURI);
 });

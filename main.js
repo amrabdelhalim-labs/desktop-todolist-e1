@@ -1,9 +1,20 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, Notification, Tray } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, Notification, Tray, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { create } = require('domain');
 
 const appPath = app.getPath('userData');
+
+// منع تشغيل نسخ متعددة من التطبيق (Single Instance Lock)
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    app.quit();
+}
+
+// ضبط معرف التطبيق لنظام ويندوز (لظهور الإشعارات بشكل صحيح)
+if (process.platform === 'win32') {
+    app.setAppUserModelId('com.amrabdelhalim.todolist');
+}
 
 let mainWindow,
     addWindow,
@@ -45,13 +56,17 @@ const mainMenuTemplate = [
     },
 ];
 
+if (process.platform === 'darwin') {
+    mainMenuTemplate.unshift({});
+};
+
 const createTray = () => {
-    const tray = new Tray(path.join(__dirname, './assets/images/icon.png'));
+    const trayIcon = new Tray(path.join(__dirname, './assets/images/icon.png'));
     const contextMenu = Menu.buildFromTemplate([
         {
             label: 'إظهار التطبيق',
             click: () => {
-                mainWindow.show();
+                if (mainWindow) mainWindow.show();
             },
         },
         {
@@ -62,24 +77,87 @@ const createTray = () => {
         },
     ]);
 
-    tray.on('click', () => {
-        mainWindow.show();
+    trayIcon.on('click', () => {
+        if (mainWindow) mainWindow.show();
     });
 
-    tray.setContextMenu(contextMenu);
-    tray.setToolTip('تطبيق إدارة المهام');
+    trayIcon.setContextMenu(contextMenu);
+    trayIcon.setToolTip('تطبيق إدارة المهام');
 
-    return tray;
+    return trayIcon;
 };
 
+// دالة منفصلة لإنشاء النافذة الرئيسية (Refactoring)
+const createMainWindow = () => {
+    if (mainWindow) return; // منع إنشاء نافذة جديدة إذا كانت موجودة
+
+    const mainMenu = Menu.buildFromTemplate(mainMenuTemplate);
+
+    mainWindow = new BrowserWindow({
+        width: 800,
+        height: 700,
+        webPreferences: {
+            // إعدادات الأمان الموصى بها
+            nodeIntegration: false, 
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js'), // تأكد من وجود هذا الملف
+        },
+    });
+
+    mainWindow.loadFile('index.html');
+    Menu.setApplicationMenu(mainMenu);
+
+    // --- تحسينات الأمان وتجربة المستخدم ---
+
+    // 1. فتح الروابط الخارجية في المتصفح الافتراضي
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        shell.openExternal(url);
+        return { action: 'deny' };
+    });
+
+    // 2. منع التنقل غير المصرح به داخل النافذة
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        if (url !== mainWindow.webContents.getURL()) {
+            event.preventDefault();
+            shell.openExternal(url);
+        }
+    });
+
+    // --- أحداث النافذة ---
+
+    // تصغير النافذة إلى الـ Tray
+    mainWindow.on('minimize', (event) => {
+        event.preventDefault();
+        mainWindow.hide();
+        tray = createTray();
+    });
+
+    // استعادة النافذة
+    mainWindow.on('restore', () => {
+        mainWindow.show();
+        if (tray) tray.destroy();
+    });
+
+    // عند الإغلاق
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+    });
+};
+
+// النوافذ الفرعية (مع تحديث إعدادات الأمان)
 const intitAddWindow = () => {
+    if (addWindow) return;
+    
     addWindow = new BrowserWindow({
         width: 400,
         height: 250,
         title: 'إضافة مهمة نصية',
+        parent: mainWindow, // جعلها تابعة للرئيسية
+        modal: true,        // جعلها مشروطة (Modal)
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js')
         },
     });
 
@@ -87,19 +165,24 @@ const intitAddWindow = () => {
     addWindow.removeMenu();
 
     addWindow.on('closed', (e) => {
-        e.preventDefault();
         addWindow = null;
     });
 };
 
 const createTimedWindow = () => {
+    if (timedWindow) return;
+
     timedWindow = new BrowserWindow({
         width: 400,
         height: 400,
         title: 'إضافة مهمة مؤقتة',
+        parent: mainWindow,
+        modal: true,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            backgroundThrottling: false, // لضمان عمل المؤقت في الخلفية
+            preload: path.join(__dirname, 'preload.js')
         },
     });
 
@@ -107,18 +190,23 @@ const createTimedWindow = () => {
     timedWindow.removeMenu();
 
     timedWindow.on('closed', (e) => {
-        e.preventDefault();
         timedWindow = null;
     });
 };
 
 const createImagedWindow = () => {
+    if (imagedWindow) return;
+
     imagedWindow = new BrowserWindow({
         width: 400,
         height: 420,
+        title: 'إضافة مهمة مع صورة',
+        parent: mainWindow,
+        modal: true,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js')
         },
     });
 
@@ -126,64 +214,56 @@ const createImagedWindow = () => {
     imagedWindow.removeMenu();
 
     imagedWindow.on('closed', (e) => {
-        e.preventDefault();
         imagedWindow = null;
     });
 };
 
-process.env.NODE_ENV = 'production';
+// --- دورة حياة التطبيق (App Lifecycle) ---
 
+// 1. عند جاهزية التطبيق
 app.on('ready', () => {
-    const mainMenu = Menu.buildFromTemplate(mainMenuTemplate);
+    createMainWindow();
+    
+    // التعامل مع النسخة الثانية (إذا حاول المستخدم فتح التطبيق وهو يعمل بالفعل)
+    app.on('second-instance', () => {
+        mainWindow = BrowserWindow.getAllWindows()[0];
 
-    mainWindow = new BrowserWindow({
-        width: 800,
-        height: 700,
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-            devTools: process.env.NODE_ENV !== 'production',
-        },
-    });
-
-    mainWindow.loadFile('index.html');
-    Menu.setApplicationMenu(mainMenu);
-
-    mainWindow.on('closed', () => {
-        app.quit();
-    });
-
-    mainWindow.on('window-all-closed', (e) => {
-        if (process.platform !== 'darwin') {
-            app.quit();
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
         };
-    });
-
-    mainWindow.on('minimize', (event) => {
-        event.preventDefault();
-        mainWindow.hide();
-        tray = createTray();
-    });
-
-    mainWindow.on('restore', () => {
-        mainWindow.show();
-        tray.destroy();
     });
 });
 
+// 2. عند إغلاق جميع النوافذ
+app.on('window-all-closed', (e) => {
+    if (process.platform !== 'darwin') {
+        app.quit();
+    };
+});
+
+// 3. عند التنشيط (خاص بـ macOS)
+app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+        createMainWindow();
+    };
+});
+
+// --- معالجة الرسائل (IPC Handlers) ---
+
 ipcMain.on("add-normal-task", (e, task) => {
-    mainWindow.webContents.send("add-normal-task", task);
-    addWindow.close();
+    if (mainWindow) mainWindow.webContents.send("add-normal-task", task);
+    if (addWindow) addWindow.close();
 });
 
 ipcMain.on("add-timed-task", (e, note, time) => {
-    mainWindow.webContents.send("add-timed-task", note, time);
-    timedWindow.close();
+    if (mainWindow) mainWindow.webContents.send("add-timed-task", note, time);
+    if (timedWindow) timedWindow.close();
 });
 
 ipcMain.on("add-imaged-task", (e, note, imgUri) => {
-    mainWindow.webContents.send("add-imaged-task", note, imgUri);
-    imagedWindow.close();
+    if (mainWindow) mainWindow.webContents.send("add-imaged-task", note, imgUri);
+    if (imagedWindow) imagedWindow.close();
 });
 
 ipcMain.on("new-normal-task", () => {
@@ -216,7 +296,7 @@ ipcMain.on("create-txt", (e, taskNote) => {
             { name: 'All Files', extensions: ['*'] }
         ],
     }).then((file) => {
-        if (!file.canceled) {
+        if (!file.canceled && file.filePath) {
             fs.writeFile(file.filePath.toString(), taskNote, (err) => {
                 if (err) throw err;
             });
@@ -235,33 +315,38 @@ ipcMain.on("upload-image", (e) => {
             { name: 'All Files', extensions: ['*'] }
         ],
     }).then((file) => {
-        if (!file.canceled) {
-            e.sender.send("open-file", file.filePaths, appPath);
+        if (!file.canceled && file.filePaths.length > 0) {
+            e.sender.send("open-file", file.filePaths, appPath, process.platform);
         };
     }).catch((err) => {
         console.log(err);
     });
 });
 
-if (process.platform === 'darwin') {
-    mainMenuTemplate.unshift({});
-};
+// نسخ الصورة إلى مجلد التطبيق
+ipcMain.on("copy-image", (e, data) => {
+    const { imagePath, filePath } = data;
+    
+    if (imagePath && filePath) {
+        fs.copyFile(imagePath, filePath, (err) => {
+            if (err) {
+                console.error('خطأ في نسخ الصورة:', err);
+            } else {
+                console.log('✅ تم نسخ الصورة بنجاح إلى:', filePath);
+            };
+        });
+    };
+});
 
-if (process.env.NODE_ENV !== "production") {
-    mainMenuTemplate.push({
-        label: "أدوات المطور",
-        submenu: [
-            {
-                label: "فتح وإغلاق أدوات المطور",
-                accelerator: process.platform === 'darwin' ? 'Cmd+D' : 'Ctrl+D',
-                click() {
-                    mainWindow.toggleDevTools();
-                }
-            },
-            {
-                label: "إعادة تحميل التطبيق",
-                role: "reload"
-            }
-        ],
-    });
-};
+// حذف الصورة من مجلد التطبيق
+ipcMain.on("delete-image", (e, imgPath) => {
+    if (imgPath && fs.existsSync(imgPath)) {
+        fs.unlink(imgPath, (err) => {
+            if (err) {
+                console.error('خطأ في حذف الصورة:', err);
+            } else {
+                console.log('✅ تم حذف الصورة بنجاح:', imgPath);
+            };
+        });
+    };
+});

@@ -1,7 +1,3 @@
-const { ipcRenderer } = require("electron");
-const fs = require('fs');
-const path = require('path');
-
 const form = document.querySelector("form");
 
 let fileName, //معرف اسم الصوره
@@ -15,15 +11,17 @@ let btn = document.querySelector(".img-upload"),
 
 btn.addEventListener("click", () => {
     if (urlImg.value.length == 0) {
-        ipcRenderer.send("upload-image");
+        window.api.send("upload-image");
     };
 });
 
-ipcRenderer.on('open-file', (event, arg, appPath) => {
+window.api.receive('open-file', (arg, appPath, platform) => {
     if (urlImg.value.length == 0) {
         imagePath = arg[0]; //المسار الأصلي  للصوره
-        fileName = path.basename(imagePath); //اسم الصوره  فقط
-        filePath = process.platform === 'win32' ? appPath + '\\' + fileName : appPath + fileName; //المسار الجديد لحفظ الصوره
+        // استخراج اسم الملف من المسار بدون استخدام path.basename
+        fileName = imagePath.split(/[/\\]/).pop();
+        // بناء المسار الجديد
+        filePath = platform === 'win32' ? appPath + '\\' + fileName : appPath + '/' + fileName;
     };
 });
 
@@ -35,12 +33,9 @@ form.addEventListener("submit", function (e) {
 
     if (urlImg.value.length == 0) {
         //نسخ الصوره المختارة إلى المكان المخصص لها
-        fs.copyFile(imagePath, filePath, (err) => {
-            if (err) throw err;
-        });
-
-        ipcRenderer.send("add-imaged-task", input, filePath);
+        window.api.send("copy-image", {imagePath, filePath});
+        window.api.send("add-imaged-task", input, filePath);
     } else if (urlImg.value.length !== 0) {
-        ipcRenderer.send("add-imaged-task", input, urlImgPath);
+        window.api.send("add-imaged-task", input, urlImgPath);
     };
 });
