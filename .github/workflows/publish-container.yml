@@ -1,0 +1,38 @@
+name: Container
+
+on:
+  pull_request:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ startsWith(github.ref, 'refs/tags/') }}
+          tags: |
+            ghcr.io/amrabdelhalim-labs/desktop-todolist-e1:${{ github.ref_name }}
+            ghcr.io/amrabdelhalim-labs/desktop-todolist-e1:latest
+      - name: Verify published architectures
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          docker buildx imagetools inspect \
+            "ghcr.io/amrabdelhalim-labs/desktop-todolist-e1:${GITHUB_REF_NAME}"
