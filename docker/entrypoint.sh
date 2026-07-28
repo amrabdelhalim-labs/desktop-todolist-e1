@@ -2,6 +2,17 @@
 set -eu
 
 export DISPLAY=:99
+
+# A restarted container reuses its writable layer. Remove stale display
+# artifacts defensively before Xvfb starts, even if the previous shutdown was
+# unclean and its signal handler never ran.
+if [ -e /tmp/.X99-lock ]; then
+    unlink /tmp/.X99-lock
+fi
+if [ -e /tmp/.X11-unix/X99 ]; then
+    unlink /tmp/.X11-unix/X99
+fi
+
 Xvfb :99 -screen 0 1024x768x24 -nolisten tcp &
 xvfb_pid=$!
 
